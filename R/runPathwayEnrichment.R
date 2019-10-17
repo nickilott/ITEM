@@ -1,0 +1,37 @@
+ensembl2entrezid <- function(ensembl.ids, dataset="hsapiens_gene_ensembl"){
+    
+    mart <- useDataset(dataset, useMart('ensembl'))
+    entrez.genes <- getBM(filters='ensembl_gene_id',
+                              attributes=c('ensembl_gene_id', 'entrezgene_id'),
+                              values=ensembl.ids,
+                              mart=mart)
+}
+
+
+#' Run pathways analysis for each module from a given network
+#'
+#' Use clusterProfiler to preform enrichment analysis on each module in a
+#' given network
+#' @param background background set of genes
+#' @param foreground foreground set of genes
+#' @param input.type the type of input id e.g. ENSEMBL
+#' @param organism organism of input
+#' @param pathway.db database used by clusterProfiler to perform
+#' enrichment testing
+#' @return 
+#' @import biomaRt clusterProfiler
+#' @examples
+#' 
+#' @export
+
+runPathwayEnrichment <- function(background, foreground, pathway.db="kegg"){
+
+    # pathways to use
+    if (pathway.db == 'kegg'){
+        run.function <- enrichKEGG
+    }
+    res <- run.function(foreground,
+                        organism="hsa",
+			universe=background.genes)
+    return(res)
+}

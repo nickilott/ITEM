@@ -1,0 +1,95 @@
+
+permuteOverlaps <- function(module1.genes, module2.genes, background1, background2,nperm=1000){
+
+    overlap.dist <- c()
+    for (i in 1:nperm){
+        n1 <- length(module1.genes)
+	n2 <- length(module2.genes)
+	set1 <- sample(background1, n1)
+	set2 <- sample(background2, n2)
+        overlap <- intersect(set1, set2)
+	overlap.dist <- append(overlap.dist, length(overlap))
+    }
+    return(list(overlap.dist, median(overlap.dist)))
+    }
+
+computePvalue <- function(overlap.n, overlap.dist, nperm){
+
+    p <- length(overlap.dist[overlap.dist >= overlap.n])/nperm
+    return(p)
+    }
+
+#' Build a matrix of overlaps between modules
+#'
+#' Overlap genes in each module from one tissue to genes in modules from the other tissue
+#' @param ITEMDataSet
+#' @return matrix matrix of overlaps
+#' @examples
+#' buildInterTissueOverlaps(ITEMDataSet)
+#' @export
+
+buildInterTissueOverlaps <- function(ITEMDataSet, nperm=1000){
+
+    modules1 <- ITEMDataSet[[10]]
+    modules1$Module <- paste0(ITEMDataSet$ref, ".", modules1$Module)
+    modules2 <- ITEMDataSet[[11]]
+    modules2$Module <- paste0(ITEMDataSet$comparison, ".", modules2$Module)   
+
+    combinations <- expand.grid(unique(modules1$Module), unique(modules2$Module))
+    colnames(combinations) <- c(ITEMDataSet$ref, ITEMDataSet$comparison)
+
+    total.pairs <- nrow(combinations)
+
+    # do overlaps
+    percents <- c()
+    fold.enrichments <- c()
+    pvalues <- c()
+
+    flog.info("Calculating module overlaps and fold enrichments")
+    for (i in 1:nrow(combinations)){
+        module1.genes <- modules1[modules1$Module == combinations[i,1],]$Gene
+        module2.genes <- modules2[modules2$Module == combinations[i,2],]$Gene
+
+        # Still figuring out what to use as the total here...
+	## this for union - may  minimise overlap
+        # total <- length(union(module1.genes, module2.genes))
+
+        ## This as a proportion of smallest set
+        total <- min(length(module1.genes), length(module2.genes))
+
+        intersection <- length(intersect(module1.genes, module2.genes))
+        percent <- (intersection/total)*100
+        percents <- append(percents, percent)
+
+        # permute the expected overlaps for given modules
+        if (i %in% append(c(1), seq(10, 10000, 10))){
+            flog.info(paste0("Running ", nperm, " permutations for ", " module pair ", i, " (", round(i/total.pairs*100, 2), "%)"))}
+        
+        perm <- permuteOverlaps(module1.genes,
+	                        module2.genes,
+				modules1$Gene,
+				modules2$Gene,
+				nperm=1000)
+
+        overlap.dist <- perm[[1]]
+	median.overlap <- perm[[2]]
+	p <- computePvalue(intersection, overlap.dist, nperm)
+        pvalues <- append(pvalues, p)
+
+        if (intersection == 0 & median.overlap == 0){
+	    fold.enrichment <- 1
+	} else if (intersection == 0 & median.overlap != 0){
+	    fold.enrichment <- -Inf
+	} else if (intersection != 0 & median.overlap == 0){
+	    fold.enrichment <- Inf
+	} else {
+            fold.enrichment <- intersection/median.overlap
+	}
+        fold.enrichments <- append(fold.enrichments, fold.enrichment)
+    }
+    combinations$PercentOverlap <- percents
+    combinations$FoldEnrichment <- fold.enrichments
+    combinations$adjusted.P <- p.adjust(pvalues, method="BH")
+
+    return(combinations)
+}

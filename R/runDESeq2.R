@@ -1,0 +1,68 @@
+#' Run differential expression between tissues
+#'
+#' Run tissue comparisons for differential expression
+#' @param mat counts matrix
+#' @param metadata metadata with rows in order of columns of counts matrix
+#' @param tissue.var variable in metadata that corresponds to tissue type
+#' @param individual.var variable in metadata that corresponds to individual (matched)
+#' @param mat filter.a filter counts matrix for counts above this value in > filter.k individuals
+#' @param mat filter.k filter counts matrix for counts above filter.a in > this number of individuals
+#' @param ref specify the reference for differential expression i.e. x/ref will be the result
+#' @return DESeq2 results table
+#' @import DESeq2 futile.logger
+#' @examples
+#' runDESeq2(mat, metadata, tissue.var=Tissue, individual.var=Individual)
+#' @export
+
+runDESeq2 <- function(mat,
+                      metadata,
+		      tissue.var="Tissue.location",
+		      individual.var="Patient.ID",
+		      filter.a=10,
+		      filter.k=10,
+		      threshold.padj=0.05,
+		      threshold.log2fold=1,
+		      ref="Caecum"){
+
+    metadata$Tissue <- metadata[,tissue.var]
+    metadata$Individual <- metadata[,individual.var]
+
+    dds <- DESeqDataSetFromMatrix(countData = mat,
+                                  colData = metadata,
+			          design = ~ Individual + Tissue)
+
+    flog.info("Filtering matrix")
+    # filtering > a in at least k samples (i.e. all of one condition)
+    keep <- rowSums(counts(dds) >= filter.a) >= filter.k
+    keep <- keep[keep==TRUE]
+    keep <- names(keep)
+
+    # filtering dds
+    dds <- dds[keep,]
+
+    nstart <- nrow(mat)
+    nend <- length(keep)
+    flog.info(paste0("Started with ", nstart, " genes, ", " with ", nend, " left after filtering"))
+    
+
+    # make sure conditions are factors
+    groups <- unique(dds$Tissue)
+    ref <- as.character(groups[groups == ref])
+    comparison <- as.character(groups[groups != ref])
+    dds$Tissue <- factor(dds$Tissue, levels=c(ref, comparison))
+
+    # run analysis
+    dds.lrt <- DESeq(dds, test="LRT", fitType="local", reduced=~Individual)
+    res <- results(dds.lrt)
+
+    # return result set
+    # This is a dataframe of genes and their status
+    up <- rownames(res[res$padj < threshold.padj & !(is.na(res$padj)) & res$log2FoldChange > threshold.log2fold & !(is.na(res$log2FoldChange)),])
+    down <- rownames(res[res$padj < threshold.padj & !(is.na(res$padj)) & res$log2FoldChange < (-1*threshold.log2fold) & !(is.na(res$log2FoldChange)),])
+
+    result <- data.frame(gene=rownames(res))
+    result$status <- ifelse(result$gene %in% up, comparison, NA)
+    result$status <- ifelse(result$gene %in% down, ref, result$status)
+    result$status <- ifelse(is.na(result$status), "NotSignificant", result$status)
+    return(list(mat[keep,], res, result))
+    }

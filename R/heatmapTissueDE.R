@@ -1,0 +1,41 @@
+#' Plot a heatmap of differences between tissues
+#'
+#' Results from DESeq2 analysis between tissues are plotted as a heatmap
+#' @param normalised.counts normalised counts matrix
+#' @param gene.annotations annotations object outpur from runDESeq2
+#' @param metadata metadata to take sample tissue annotations from 
+#' @param tissue.var variable in metadata corresponding to tissue annotation
+#' @import pheatmap
+#' @examples
+#' heatmapTissueDE(normalised.counts, gene.annotations, metadata, tissue.var="Tissue.location")
+#' @export
+
+heatmapTissueDE <- function(normalised.counts, gene.annotations, metadata, tissue.var="Tissue.location", scale="row"){
+
+    # filter gene annotations for only those of
+    # interest i.e. differentially expressed
+    gene.annotations <- gene.annotations[gene.annotations$status != "NotSignificant",]
+
+    # subset input
+    normalised.counts.sub <- normalised.counts[gene.annotations$gene,]
+
+    # define heatmap colours
+    colours <- colorRampPalette(c("blue", "white", "red"))(75) 
+
+    # define column annotations
+    Tissue <- metadata[,tissue.var]
+    sample.annotation <- data.frame("Tissue" = Tissue)
+    rownames(sample.annotation) <- rownames(metadata)
+
+    # define row annotations
+    row.annotation <- data.frame("Tissue association" = gene.annotations$status)
+    rownames(row.annotation) <- gene.annotations$gene
+
+    # draw the heatmap
+    pheatmap(normalised.counts.sub,
+             color=colours,
+	     scale=scale,
+	     annotation_col=sample.annotation,
+#	     annotation_row=row.annotation,
+	     show_rownames=FALSE)
+}

@@ -1,0 +1,13 @@
+#' Run PCA
+#'
+#' Run PCA on matrix
+#' @param df data frame of normalised counts
+#' @export
+#' @examples
+#' runPCA(df)
+
+runPCA <- function(df, scale=TRUE){
+
+    pc <- prcomp(t(df), scale=scale)
+    return (pc)
+}

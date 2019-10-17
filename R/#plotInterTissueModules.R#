@@ -1,0 +1,50 @@
+#' Plot inter-tissue modules
+#'
+#' Scatterplot the raltionship between % gene overlaps and eigengene correlations
+#' between modules across tissues.
+#' @param ITEMDataSet
+#' @import ggplot2 reshape
+#' @examples
+#' plotInterTissueModules(ITEMDataSet)
+#' @export
+
+plotInterTissueModules <- function(ITEMDataSet){
+
+    # get correlations
+    cors <- as.data.frame(correlateMEs(ITEMDataSet))
+    cors$modules.1 <- rownames(cors)
+    cors.m <- melt(cors)
+    colnames(cors.m) <- c("modules.1", "modules.2", "cor")
+
+    # sort out the data so that it matches the overlaps data
+    cors.m$tissue.1 <- gsub("\\.[0-9]*", "", cors.m$modules.1)
+    cors.m$tissue.2 <- gsub("\\.[0-9]*", "", cors.m$modules.2)
+    cors.m <- cors.m[cors.m$tissue.1 == ITEMDataSet$ref & cors.m$tissue.2 == ITEMDataSet$comparison,]
+
+    # create new module pair names
+    cors.m$module.module <- paste0(cors.m$modules.1, "_", cors.m$modules.2)
+    rownames(cors.m) <- cors.m$module.module
+
+    # get the overlaps
+    overlaps <- buildModuleOverlaps(ITEMDataSet)
+
+    # create new module pair names
+    overlaps$module.module <- paste0(overlaps[,1], "_", overlaps[,2])
+    rownames(overlaps) <- overlaps$module.module
+
+    # get a new data frame with columns of interest
+    overlaps <- overlaps[rownames(cors.m),]
+    toplot <- data.frame(module.module=overlaps$module.module,
+                         overlap=overlaps$PercentOverlap,
+			 cor=cors.m$cor)
+    toplot <- toplot[grep("\\.0", toplot$module.module, invert=TRUE),]
+
+    print(dim(toplot))
+
+    # plot
+    theme_set(theme_bw())
+    p1 <- ggplot(toplot, aes(x=foldEnrichment, y=cor, size=overlap)) + geom_point(size=3)
+    p1 <- p1 + xlab("% gene overlap") + ylab("Module correlation")
+    p1 <- p1 + ggtitle("Inter-tissue module features")
+    return(p1)
+}

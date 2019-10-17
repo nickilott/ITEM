@@ -1,0 +1,62 @@
+formatCorTable <- function(cors, ITEMDataSet, type=c("cor", "padj")){
+
+    # reshape
+    cors.m <- melt(cors)
+    colnames(cors.m) <- c("modules.1", "modules.2", type)
+
+    # sort out the data so that it matches the overlaps data
+    cors.m$tissue.1 <- gsub("\\.[0-9]*", "", cors.m$modules.1)
+    cors.m$tissue.2 <- gsub("\\.[0-9]*", "", cors.m$modules.2)
+    cors.m <- cors.m[cors.m$tissue.1 == ITEMDataSet$ref & cors.m$tissue.2 == ITEMDataSet$comparison,]
+
+    # create new module pair names
+    cors.m$module.module <- paste0(cors.m$modules.1, "_", cors.m$modules.2)
+    rownames(cors.m) <- cors.m$module.module
+
+    return(cors.m)
+    } 
+
+#' Build inter-tissue featuress
+#'
+#' Build an ITEMOverlapSet object of relationships between % gene overlaps and eigengene correlations
+#' between modules across tissues.
+#' @param ITEMDataSet
+#' @import reshape
+#' @examples
+#' buildInterTissueFeatures(ITEMDataSet)
+#' @export
+
+buildInterTissueFeatures <- function(ITEMDataSet){
+
+    # get correlations
+    cors <- correlateMEs(ITEMDataSet)
+    cors.cor <- data.frame(cors$r)
+    cors.p <- data.frame(cors$p)
+
+    cors.cor$modules.1 <- rownames(cors.cor)
+    cors.p$modules.1 <- rownames(cors.p)
+
+    # reformat 
+    cors.m <- formatCorTable(cors.cor, ITEMDataSet, type="cor")
+    cors.p.m <- formatCorTable(cors.p, ITEMDataSet, type="padj")
+
+    # get the overlaps
+    overlaps <- buildInterTissueOverlaps(ITEMDataSet)
+
+    # create new module pair names
+    overlaps$module.module <- paste0(overlaps[,1], "_", overlaps[,2])
+    rownames(overlaps) <- overlaps$module.module
+
+    # get a new data frame with columns of interest
+    overlaps <- overlaps[rownames(cors.m),]
+
+    overall <- data.frame(module.module=overlaps$module.module,
+                          overlap=overlaps$PercentOverlap,
+			  foldEnrichment=overlaps$FoldEnrichment,
+			  cor=cors.m$cor,
+			  cor.p=cors.p.m$padj)
+
+    overall <- overall[grep("\\.0", overall$module.module, invert=TRUE),]
+    result <- ITEMOverlapSet(list(overlaps, cors.cor, cors.p, overall))
+    return(result)
+}

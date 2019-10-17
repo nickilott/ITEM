@@ -1,0 +1,169 @@
+#' Inter-tissue expression maps (ITEM)
+#'
+#' This function performs the ITEM workflow that consists of wrapping DESeq2
+#' and WGCNA functionality to determine differentially expressed genes between
+#' tissues and how they map on to co-expressed genes across tissues.
+#' and uses this as input into WGCNA.
+#'
+#' @param counts counts matrix
+#' @param metadata metadata that contains tissue.var and individual.var for
+#' differential expression (between tissues) controlling for individual.
+#' @param tissue.var variable in metadata that corresponds to tissue type
+#' @param individual.var variable in metadata that corresponds to an individual
+#' identifier
+#' @param filter.a filter genes out if less than filter.a in less than filter.k samples
+#' @param filter.k see filter.a
+#' @param threshold.padj adjusted p-value threshold for calling DE genes between tissues
+#' @param threshold.log2fold log fold-change threshold for calling DE genes between tissues
+#' @param ref the tissue type to use as reference group in differential expression
+#' analysis
+#' @param regress whether to perform regression of variable before WGCNA
+#' @param regress.on metadata variable to regress expression matrix on
+#' @param wgcna.argument see WGCNA documentation for details
+#' @return object of class ITEMDataSet
+#' @import futile.logger
+#' @examples
+#' ITEM(counts,
+#'      metadata,
+#'	tissue.var="Tissue.location",
+#'	individual.var="Patient.ID",
+#'	filter.a=10,
+#'	filter.k=30,
+#'      threshold.padj,
+#'      threshold.log2fold,
+#'      ref="Caecum",
+#'      regress=TRUE,
+#'      regress.on="Disease",
+#'      wgcna.power=6,
+#'	wgcna.maxBlockSize=30000,
+#'	wgcna.minModuleSize=30,
+#'	wgcna.reassignThreshold=0,
+#'	wgcna.mergeCutHeight=0.25,
+#'	wgcna.numericLabels=TRUE,
+#'	wgcna.pamRespectsDendro=FALSE,
+#'	wgcna.saveTOMS=TRUE,
+#'	wgcna.saveTOMFileBase="test",
+#'	wgcna.verbose=3,
+#'      wgcna.TOMType="signed",
+#'      wgcna.type="signed")
+#' @export
+
+ITEM <- function(counts,
+                 metadata,
+	         tissue.var="Tissue.location",
+	         individual.var="Patient.ID",
+	         filter.a=10,
+	         filter.k=30,
+		 threshold.padj=0.05,
+		 threshold.log2fold=1,
+		 regress=TRUE,
+		 regress.on="Disease",
+		 ref="Caecum",
+                 wgcna.power=6,
+	         wgcna.maxBlockSize=30000,		 
+	         wgcna.minModuleSize=30,
+	         wgcna.reassignThreshold=0,
+	         wgcna.mergeCutHeight=0.25,
+	         wgcna.numericLabels=TRUE,
+	         wgcna.pamRespectsDendro=FALSE,
+	         wgcna.saveTOMS=TRUE,
+	         wgcna.saveTOMFileBase="test",
+	         wgcna.verbose=3,
+                 wgcna.TOMType="signed",
+                 wgcna.type="signed"){
+
+    # a couple of checks
+    if (!(tissue.var %in% colnames(metadata))){
+        stop(paste0("tissue.var=", tissue.var, "not a column in metadata"))}
+    if (!(individual.var %in% colnames(metadata))){
+        stop(paste0("individual.var=", individual.var, "not a column in metadata"))}
+    if (!(ref %in% metadata[,tissue.var])){
+        stop(paste0("ref=", ref, "not a group in tissue.var column"))}
+
+    # run DESeq2 analysis
+    flog.info("Running differential expression analysis")
+    de.res <- runDESeq2(counts,
+                        metadata,
+			tissue.var=tissue.var,
+			individual.var=individual.var,
+			filter.a=filter.a,
+			filter.k=filter.k,
+			threshold.padj=threshold.padj,
+			threshold.log2fold=threshold.log2fold,
+			ref=ref)
+
+    # Normalise counts
+    flog.info("Normalising counts - log2(counts per million)")
+    cpm <- log2cpm(de.res[[1]])
+
+    # At this point we split the data by tissue
+    tissues <- unique(metadata[,tissue.var])
+    comparison.tissue <- tissues[tissues != ref]
+
+    tissue1.metadata <- metadata[metadata[,tissue.var] == ref,]
+    tissue2.metadata <- metadata[metadata[,tissue.var] == comparison.tissue,]
+
+    tissue1.cpm <- cpm[,rownames(tissue1.metadata)]
+    tissue2.cpm <- cpm[,rownames(tissue2.metadata)]
+
+    # run WGCNA on tissue1
+    flog.info(paste0("Running WGCNA analysis for "), ref)
+    wgcna.res1 <- runWGCNA(tissue1.cpm,
+                           tissue1.metadata,
+			   regress=regress,
+			   regress.on=regress.on,
+   		           wgcna.power=wgcna.power,
+ 		           wgcna.maxBlockSize=wgcna.maxBlockSize,
+		           wgcna.minModuleSize=wgcna.minModuleSize,
+		           wgcna.reassignThreshold=wgcna.reassignThreshold,
+		           wgcna.mergeCutHeight=wgcna.mergeCutHeight,
+		           wgcna.numericLabels=wgcna.numericLabels,
+		           wgcna.pamRespectsDendro=wgcna.pamRespectsDendro,
+		           wgcna.saveTOMS=wgcna.saveTOMS,
+		           wgcna.saveTOMFileBase=wgcna.saveTOMFileBase,
+		           wgcna.verbose=wgcna.verbose,
+                           wgcna.TOMType=wgcna.TOMType,
+                           wgcna.type=wgcna.type)
+
+    # run WGCNA on tissue2
+    flog.info(paste0("Running WGCNA analysis for "), comparison.tissue)
+    wgcna.res2 <- runWGCNA(tissue2.cpm,
+                           tissue2.metadata,
+			   regress=regress,
+			   regress.on=regress.on,
+   		           wgcna.power=wgcna.power,
+ 		           wgcna.maxBlockSize=wgcna.maxBlockSize,
+		           wgcna.minModuleSize=wgcna.minModuleSize,
+		           wgcna.reassignThreshold=wgcna.reassignThreshold,
+		           wgcna.mergeCutHeight=wgcna.mergeCutHeight,
+		           wgcna.numericLabels=wgcna.numericLabels,
+		           wgcna.pamRespectsDendro=wgcna.pamRespectsDendro,
+		           wgcna.saveTOMS=wgcna.saveTOMS,
+		           wgcna.saveTOMFileBase=wgcna.saveTOMFileBase,
+		           wgcna.verbose=wgcna.verbose,
+                           wgcna.TOMType=wgcna.TOMType,
+                           wgcna.type=wgcna.type)
+
+    # label modules
+    flog.info("Labelling genes in modules with tissue association status")
+    net1 <- wgcna.res1[[2]]
+    net2 <- wgcna.res2[[2]]
+    gene.annotation <- de.res[[3]]
+    label.table1 <- labelGenesInModules(net1, gene.annotation, wgcna.res1[[1]])
+    label.table2 <- labelGenesInModules(net2, gene.annotation, wgcna.res2[[1]])
+
+    all.result <- list(ref,
+                       comparison.tissue,
+                       de.res[[1]],
+                       de.res[[2]],
+		       de.res[[3]],
+		       wgcna.res1[[1]],
+		       wgcna.res1[[2]],
+		       wgcna.res2[[1]],
+		       wgcna.res2[[2]],
+                       label.table1,
+		       label.table2,
+		       tissue1.metadata,
+		       tissue2.metadata)
+    return(ITEMDataSet(all.result))
+}

@@ -1,0 +1,48 @@
+#' Run WCGNA
+#'
+#' This function regresses a normalised matrix for the effect of tissue
+#' and uses this as input into WGCNA.
+#' @param normalised.counts normalised (cpm) counts
+#' @param metadata metadata with rows in order of columns of counts matrix
+#' @param tissue.var variable in metadata that corresponds to tissue type
+#' @return WGCNA results
+#' @import WGCNA
+#' @examples
+#' runWGCNA(normalised.counts, metadata, tissue.var="Tissue.location")
+#' @export
+
+runWGCNA <- function(normalised.counts,
+                     metadata,
+		     tissue.var="Tissue.location",
+		     wgcna.power=6,
+		     wgcna.maxBlockSize=30000,
+		     wgcna.minModuleSize=30,
+		     wgcna.reassignThreshold=0,
+		     wgcna.mergeCutHeight=0.25,
+		     wgcna.numericLabels=TRUE,
+		     wgcna.pamRespectsDendro=FALSE,
+		     wgcna.saveTOMS=TRUE,
+		     wgcna.saveTOMFileBase="test",
+		     wgcna.verbose=3,
+                     wgcna.TOMType="signed",
+                     wgcna.type="signed"){
+
+    regressed.counts <- regressOnTissue(normalised.counts, metadata, tissue.var=tissue.var)
+
+    net = blockwiseModules(t(regressed.counts),
+                           maxBlockSize=30000,
+                           power=wgcna.power,
+			   TOMType=wgcna.TOMType,
+			   minModuleSize=wgcna.minModuleSize,
+                           reassignThreshold=wgcna.reassignThreshold,
+			   mergeCutHeight=wgcna.mergeCutHeight,
+			   numericLabels=wgcna.numericLabels,
+                           pamRespectsDendro=wgcna.pamRespectsDendro,
+                           saveTOMs=TRUE,
+                           saveTOMFileBase="ITEMTest",
+                           verbose=wgcna.verbose,
+                           type=wgcna.type)
+
+    return(list(regressed.counts, net))
+}
+    

@@ -1,0 +1,55 @@
+#' Create ITEMDataSet class
+#'
+#' Create ITEMDataSet class
+#' @param results.list list of results from ITEM()
+#' @return ITEMDataSet object
+#' @examples
+#' ITEMDataSet(results.list)
+#' @export
+
+ITEMDataSet <- function(results.list){
+
+    names(results.list) <- c("filteredCounts",
+			     "DESeq2Results",
+                             "diffGenes",
+                             "residualsMatrix",
+			     "net",
+			     "moduleLabels",
+			     "metadata")
+    class(results.list) <- "ITEMDataSet"
+    return(results.list)
+    }
+
+####
+####
+summary <- function(obj){
+
+    UseMethod("summary")
+    }
+
+#' Create ITEMDataSet summary method
+#'
+#' Create ITEMDataSet summary method
+#' @param obj ITEMDataSet object
+#' @return printed summary
+#' @examples
+#' summary(ITEMDataSet)
+#' @export
+
+summary.ITEMDataSet <- function(obj){
+
+    total.genes <- nrow(obj$filteredCounts)
+    ngenes.diff <- nrow(obj$DESeq2Results[obj$DESeq2Results$padj < 0.05 & !(is.na(obj$DESeq2Results$padj)),])
+
+    # don't count 0 module
+    nmodules <- length(unique(obj$moduleLabels$Module[obj$moduleLabels$Module != 0]))
+
+    cat("\n## DESeq2 results\n\n")
+    cat(paste0("Total number of genes analysed = ", total.genes, "\n"))
+    cat(paste0("Number of genes differentially expressed by tissue = ", ngenes.diff, "\n"))
+    cat("\n\n")
+    cat("## WGCNA results\n\n")
+    cat("Number of modules = ", nmodules, "\n")
+    cat("Number of genes in modules\n")
+    print(table(obj$net$colors))
+    }

@@ -1,0 +1,18 @@
+#' Create ITEMOverlapSet class
+#'
+#' Create ITEMDataSet class
+#' @param results.list list of results from ITEM()
+#' @return ITEMOverlapSet object
+#' @examples
+#' ITEMOverlapSet(results.list)
+#' @export
+
+ITEMOverlapSet <- function(results.list){
+
+    names(results.list) <- c("overlaps",
+                             "cors",
+			     "cors.p",
+                             "overall")
+    class(results.list) <- "ITEMOverlapSet"
+    return(results.list)
+    }
