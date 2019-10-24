@@ -1,18 +1,19 @@
 #' Run pathways analysis for each module from a given network
 #'
-#' Use clusterProfiler to preform enrichment analysis on each module in a
+#' Use GOseq to preform enrichment analysis on each module in a
 #' given network
 #' ITEMDataSet object defining module assignment
 #' @param input.type the type of input id e.g. ensembl
-#' @param organism organism of input
-#' @param pathway.db database used by clusterProfiler to perform
+#' @param organism.db organism of input
+#' @param pathway.db database used by GOSeq to perform
 #' enrichment testing
+#' @param bias.data median length of transcripts for each gene in data, data frame mapping gene id to length
 #' @return 
 #' @examples
 #' 
 #' @export
 
-runModulePathwayEnrichment <- function(ITEMDataSet, input.type="ensembl", organism="hsapiens", pathway.db="kegg"){
+runModulePathwayEnrichment <- function(ITEMDataSet, input.type="ensGene", organism.db="hg38", pathway.db="GO:BP", bias.data=NULL){
 
     tissue1.modules <- ITEMDataSet[[10]]
     name1 <- ITEMDataSet$ref
@@ -21,10 +22,8 @@ runModulePathwayEnrichment <- function(ITEMDataSet, input.type="ensembl", organi
 
     # create background sets
     tissue1.background <- tissue1.modules[tissue1.modules$Module != 0,]$Gene
-    tissue1.background <- ensembl2entrezid(tissue1.background, dataset=paste0(organism, "_gene_", input.type))
 
     tissue2.background <- tissue2.modules[tissue2.modules$Module != 0,]$Gene
-    tissue2.background <- ensembl2entrezid(tissue2.background, dataset=paste0(organism, "_gene_", input.type))
 
     # rename modules
     tissue1.modules$Module <- paste0(name1, ".", tissue1.modules$Module)
@@ -32,14 +31,6 @@ runModulePathwayEnrichment <- function(ITEMDataSet, input.type="ensembl", organi
 
     # bind rows here
     modules.to.test <- data.frame(rbind(tissue1.modules, tissue2.modules))
-
-    # covert to entrez ids for clusterProfiler
-    flog.info("converting ensembl ids to entrez ids")
-    genes <- as.character(ensembl2entrezid(modules.to.test$Gene))
-    genes <- na.omit(genes)
-
-    modules.to.test <- merge(modules.to.test, genes, by.x="Gene", by.y="ensembl_gene_id",)
-    modules.to.test$Gene <- as.character(modules.to.test$entrezgene_id)
 
     # enrichment is performed amongst genes that have been placed in a module i.e. remove those
     # that are in module 0 from the background
@@ -59,9 +50,14 @@ runModulePathwayEnrichment <- function(ITEMDataSet, input.type="ensembl", organi
 	    background <- tissue2.background
         }
 	foreground <- modules.to.test[modules.to.test$Module == module,]$Gene
-	enrichment.result <- runPathwayEnrichment(background,
+        background <- setdiff(background, foreground)
+
+        enrichment.result <- runPathwayEnrichment(background,
 	                                          foreground,
-						  pathway.db=pathway.db)
+						  input.type=input.type,
+						  organism.db=organism.db,
+						  pathway.db=pathway.db,
+						  bias.data=bias.data)
 
         enrichment.results[[i]] <- enrichment.result
     }
