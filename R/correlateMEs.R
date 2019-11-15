@@ -32,8 +32,8 @@ correlateMEs <- function(ITEMDataSet, individual.var="Patient.ID"){
     all.mes <- data.frame(cbind(mes1, mes2))
     rownames(all.mes) <- rownames(mes1)
 
-    # do the correlation
-    cor.mes <- corr.test(all.mes, adjust="none")
+    # do the correlation - still working out whether to perform the adjustment
+    cor.mes <- corr.test(all.mes, adjust="BH")
 
     return(cor.mes)
 

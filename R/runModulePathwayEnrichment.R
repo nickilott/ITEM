@@ -13,7 +13,7 @@
 #' 
 #' @export
 
-runModulePathwayEnrichment <- function(ITEMDataSet, input.type="ensGene", organism.db="hg38", pathway.db="GO:BP", bias.data=NULL){
+runModulePathwayEnrichment <- function(ITEMDataSet, input.type="ensGene", organism.db="hg38", pathway.db="GO:BP", bias.data=NULL, gene2cat=NULL){
 
     tissue1.modules <- ITEMDataSet[[10]]
     name1 <- ITEMDataSet$ref
@@ -50,14 +50,15 @@ runModulePathwayEnrichment <- function(ITEMDataSet, input.type="ensGene", organi
 	    background <- tissue2.background
         }
 	foreground <- modules.to.test[modules.to.test$Module == module,]$Gene
-        background <- setdiff(background, foreground)
+  background <- setdiff(background, foreground)
 
-        enrichment.result <- runPathwayEnrichment(background,
+  enrichment.result <- runPathwayEnrichment(background,
 	                                          foreground,
 						  input.type=input.type,
 						  organism.db=organism.db,
 						  pathway.db=pathway.db,
-						  bias.data=bias.data)
+						  bias.data=bias.data,
+						  gene2cat=gene2cat)
 
         enrichment.results[[i]] <- enrichment.result
     }
